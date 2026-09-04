@@ -147,7 +147,12 @@
       padding: 10px 12px 12px;
     }
 
-    .cols { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+    /* align-items must be reset: the desktop rule sets `start`, which in a
+       flex column shrinks each panel to its content width. */
+    .cols {
+      flex: 1 1 auto; min-height: 0;
+      display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+    }
     .cols > div { flex: 0 0 auto; }        /* controls: natural height */
 
     .panel { padding: 8px 12px; }
@@ -397,7 +402,7 @@ function buildSvg() {
   const gridLeft = (width - gridWidth) / 2;
 
   const instructorCy = 34 + R;
-  const frontLineY = instructorCy + R + 30;
+  const frontLineY = instructorCy + R + 22;
   const gridTop = frontLineY + 26;
   const height = gridTop + rows * cell + 24;
 
@@ -412,13 +417,9 @@ function buildSvg() {
     `fill="${PAPER.mat}" stroke="${PAPER.matEdge}" stroke-width="1"/>`
   );
 
-  // Instructor, label, and the line marking the front of the room.
+  // Instructor and the line marking the front of the room. The dark circle
+  // alone stands for the instructor — the drawing carries no words.
   svg.push(circleMarkup("instructor", width / 2, instructorCy, R, INSTRUCTOR, ""));
-  svg.push(
-    `<text x="${width / 2}" y="${instructorCy + R + 16}" text-anchor="middle" ` +
-    `font-family="${SVG_FONT}" font-size="12" fill="${PAPER.inkMuted}">` +
-    `${escapeXml(INSTRUCTOR.name)}</text>`
-  );
   svg.push(
     `<line x1="${pad}" y1="${frontLineY}" x2="${width - pad}" y2="${frontLineY}" ` +
     `stroke="${PAPER.matEdge}" stroke-width="1" stroke-dasharray="5 4"/>`
