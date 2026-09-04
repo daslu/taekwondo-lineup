@@ -12,17 +12,21 @@
 
   Structure:
     1. <style>            page chrome (CSS custom properties, light/dark)
-    2. <body>             static markup; the controls are generated
+    2. <body>             static markup; the belt controls are generated
     3. CONFIG              belts, defaults, geometry, palette  <- edit here first
     4. state / helpers
     5. buildSvg()          pure: state -> SVG string (this is the infographic)
-    6. render()            SVG string -> DOM, plus status line
-    7. controls            slider wiring
+    6. render()            SVG string -> DOM, plus the headcount readout
+    7. controls            icons, slider wiring
     8. export              PNG download
 
   The SVG is built as a string rather than through the DOM so that the same
   function serves both the on-screen preview and the exported file. It uses
   no CSS variables and no external fonts, so the exported file is standalone.
+
+  The interface carries no prose: each control is an icon or a belt colour
+  plus a number. Meaning for screen readers lives in aria-label / title, so
+  those are the labels to keep accurate when adding a control.
 -->
 
 <style>
@@ -64,53 +68,56 @@
     -webkit-text-size-adjust: 100%;
   }
 
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 56px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 40px; }
 
-  h1 { font-size: 22px; font-weight: 500; margin: 0 0 20px; }
-  h2 { font-size: 15px; font-weight: 500; margin: 0 0 14px; }
+  .cols { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; align-items: start; }
 
-  .cols { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 24px; align-items: start; }
   .panel {
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 18px;
+    padding: 16px;
   }
-  .panel + .panel { margin-top: 16px; }
+  .panel + .panel { margin-top: 12px; }
 
-  .field { margin-bottom: 16px; }
-  .field:last-child { margin-bottom: 0; }
-
-  .flabel {
-    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
-    font-size: 13px; color: var(--ink-2); margin-bottom: 6px;
+  /* Every control has the same shape: [icon or belt chip] [slider] [number]. */
+  .field {
+    display: grid; grid-template-columns: 22px minmax(0, 1fr) 24px;
+    gap: 10px; align-items: center;
   }
-  .fval { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .field + .field { margin-top: 10px; }
+
+  .fval { font-size: 12px; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+
+  .ico { display: flex; align-items: center; justify-content: center; color: var(--ink-3); }
+  .ico svg, button svg { display: block; }
 
   input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); }
 
-  .belt-row {
-    display: grid; grid-template-columns: 22px minmax(0, 1fr);
-    gap: 10px; align-items: center; margin-bottom: 14px;
-  }
-  .belt-row:last-child { margin-bottom: 0; }
-
   .chip { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line-2); }
-  .rank-tag { color: var(--ink-3); font-variant-numeric: tabular-nums; }
 
-  .toggle {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 13px; color: var(--ink-2); cursor: pointer; user-select: none;
+  /* Rank order is shown by the order of the rows themselves; render() sets it. */
+  #belts { display: flex; flex-direction: column; }
+
+  .toggles { display: flex; gap: 8px; margin-top: 14px; }
+
+  .icon-toggle { position: relative; display: block; cursor: pointer; }
+  .icon-toggle input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; }
+  .icon-toggle span {
+    display: block; padding: 7px; color: var(--ink-3);
+    border: 1px solid var(--line-2); border-radius: var(--radius);
   }
-  .toggle input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+  .icon-toggle input:checked + span { color: #fff; background: var(--accent); border-color: var(--accent); }
+  .icon-toggle input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  #stage { overflow-x: auto; }
+  #stage { overflow: hidden; }
   #stage svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
 
-  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+  .bar { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
 
   button {
-    font: inherit; font-size: 14px; padding: 8px 14px;
+    font: inherit; display: flex; align-items: center; justify-content: center;
+    padding: 9px 18px;
     background: var(--card); color: var(--ink);
     border: 1px solid var(--line-2); border-radius: var(--radius);
     cursor: pointer; touch-action: manipulation;
@@ -118,8 +125,10 @@
   button:hover { border-color: var(--ink-3); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-  #status { font-size: 13px; color: var(--ink-2); margin-left: auto; text-align: right; }
-  #status.warn { color: var(--danger); }
+  .count { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--ink-2); }
+  .count .ico { color: inherit; }
+  .count.warn { color: var(--danger); }
+  #status { font-size: 12px; font-variant-numeric: tabular-nums; }
 
   .sr-only {
     position: absolute; width: 1px; height: 1px;
@@ -127,56 +136,78 @@
   }
 
   /*
-    Narrow screens: the preview moves above the controls and pins to the top,
-    so a slider you are dragging updates something you can still see.
-    Flex rather than grid — a sticky grid item has no room to travel inside
-    its own auto-sized row, so `position: sticky` would be inert there.
+    Phones: the app is sized to the viewport so every belt slider is on screen
+    without scrolling. The controls keep their natural height and the preview
+    takes what is left over, so the preview is what shrinks as belts are added.
   */
   @media (max-width: 860px) {
-    .wrap { padding: 16px 14px 40px; }
-    h1 { font-size: 20px; margin-bottom: 14px; }
+    .wrap {
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
+      padding: 10px 12px 12px;
+    }
 
-    .cols { display: flex; flex-direction: column; align-items: stretch; gap: 16px; }
-    .panel { padding: 14px; }
-    .cols > .panel { order: -1; position: sticky; top: 0; z-index: 2; }
+    .cols { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+    .cols > div { flex: 0 0 auto; }        /* controls: natural height */
 
-    /* Cap the pinned preview so the controls keep most of the screen. */
-    #stage svg { max-height: 40vh; max-height: 40dvh; }
+    .panel { padding: 8px 12px; }
+    .panel + .panel { margin-top: 8px; }
 
-    input[type=range] { height: 26px; }   /* larger touch target */
+    .cols > .panel {                       /* preview: soaks up the remainder */
+      order: -1;
+      flex: 1 1 0; min-height: 110px;
+      display: flex; flex-direction: column;
+      padding: 8px;
+    }
+    #stage { flex: 1 1 auto; min-height: 0; position: relative; }
+    /* Absolute, so max-height resolves against a definite box: the drawing
+       scales down to fit instead of pushing the controls off screen. */
+    #stage svg {
+      position: absolute; inset: 0; margin: auto;
+      max-width: 100%; max-height: 100%; width: auto; height: auto;
+    }
 
-    .bar { margin-top: 12px; }
-    .bar button { flex: 1 1 auto; padding: 11px 14px; }
-    #status { order: 3; width: 100%; margin-left: 0; text-align: left; }
+    .field + .field { margin-top: 6px; }
+    .toggles { margin-top: 8px; }
+    input[type=range] { height: 24px; }    /* larger touch target */
+    .bar { margin-top: 8px; }
+    button { padding: 7px 18px; }
   }
 </style>
 </head>
 
 <body>
 <div class="wrap">
-  <h1>Taekwondo lineup builder</h1>
+  <h1 class="sr-only">Taekwondo lineup builder</h1>
+
   <div class="cols">
     <div>
       <section class="panel">
-        <h2>Floor</h2>
+        <h2 class="sr-only">Floor</h2>
         <div class="field">
-          <div class="flabel"><span>Rows</span><span class="fval" id="rowsVal"></span></div>
-          <input type="range" id="rows" min="1" max="8" value="4">
+          <span class="ico" data-icon="rows"></span>
+          <input type="range" id="rows" min="1" max="8" value="4" aria-label="Rows">
+          <span class="fval" id="rowsVal"></span>
         </div>
         <div class="field">
-          <div class="flabel"><span>Columns</span><span class="fval" id="colsVal"></span></div>
-          <input type="range" id="cols" min="1" max="10" value="4">
+          <span class="ico" data-icon="cols"></span>
+          <input type="range" id="cols" min="1" max="10" value="4" aria-label="Columns">
+          <span class="fval" id="colsVal"></span>
         </div>
-        <div class="field">
-          <label class="toggle"><input type="checkbox" id="showNums" checked> Show position numbers</label>
-        </div>
-        <div class="field">
-          <label class="toggle"><input type="checkbox" id="reverse"> Reverse rank order</label>
+        <div class="toggles">
+          <label class="icon-toggle" title="Show position numbers">
+            <input type="checkbox" id="showNums" checked aria-label="Show position numbers">
+            <span data-icon="numbers"></span>
+          </label>
+          <label class="icon-toggle" title="Reverse rank order">
+            <input type="checkbox" id="reverse" aria-label="Reverse rank order">
+            <span data-icon="reverse"></span>
+          </label>
         </div>
       </section>
 
       <section class="panel">
-        <h2>Students per belt</h2>
+        <h2 class="sr-only">Students per belt</h2>
         <div id="belts"></div>
       </section>
     </div>
@@ -185,8 +216,10 @@
       <h2 class="sr-only">Lineup preview</h2>
       <div id="stage" role="img" aria-label="Overhead plan of the class lined up in rank order, most senior at the front right, each row filling right to left"></div>
       <div class="bar">
-        <button id="pngBtn" class="primary">Download</button>
-        <span id="status"></span>
+        <button id="pngBtn" class="primary" data-icon="download" aria-label="Download PNG" title="Download PNG"></button>
+        <span class="count" id="count">
+          <span class="ico" data-icon="people"></span><span id="status"></span>
+        </span>
       </div>
     </section>
   </div>
@@ -262,8 +295,8 @@ const el = {
   rows: $("rows"), cols: $("cols"),
   rowsVal: $("rowsVal"), colsVal: $("colsVal"),
   showNums: $("showNums"), reverse: $("reverse"),
-  belts: $("belts"), stage: $("stage"), status: $("status"),
-  pngBtn: $("pngBtn"),
+  belts: $("belts"), stage: $("stage"),
+  count: $("count"), status: $("status"), pngBtn: $("pngBtn"),
 };
 
 const escapeXml = (s) => String(s)
@@ -415,53 +448,69 @@ function render() {
   el.rowsVal.textContent = state.rows;
   el.colsVal.textContent = state.cols;
 
+  // The belt list is reordered rather than labelled: its top-to-bottom order
+  // is the rank order, and so follows the "reverse" toggle.
   rankedBelts().forEach((belt, i) => {
-    const tag = el.belts.querySelector(`[data-rank="${belt.id}"]`);
-    if (tag) tag.textContent = `#${i + 1}`;
+    const row = el.belts.querySelector(`[data-belt="${belt.id}"]`);
+    if (row) row.style.order = i;
   });
 
-  const overflow = result.total - result.capacity;
-  if (overflow > 0) {
-    el.status.className = "warn";
-    el.status.textContent =
-      `${result.total} students, ${result.capacity} places — ${overflow} left out`;
-  } else {
-    el.status.className = "";
-    el.status.textContent = `${result.total} students in ${result.capacity} places`;
-  }
-}
-
-function setStatus(text, isWarning) {
-  el.status.className = isWarning ? "warn" : "";
-  el.status.textContent = text;
+  // headcount / places, red when the floor cannot hold everyone.
+  el.count.className = result.total > result.capacity ? "count warn" : "count";
+  el.status.textContent = `${result.total} / ${result.capacity}`;
 }
 
 /* ---------------------------------------------------------------------------
    5. Controls
 --------------------------------------------------------------------------- */
 
+/*
+  Inline 16px icons, stroked in currentColor so they follow the theme and the
+  checked state of a toggle. Injected into every [data-icon] element.
+*/
+const ICONS = {
+  rows: '<path d="M2.5 4h11M2.5 8h11M2.5 12h11"/>',
+  cols: '<path d="M4 2.5v11M8 2.5v11M12 2.5v11"/>',
+  reverse: '<path d="M5 13.5V3M5 3L2.6 5.4M5 3l2.4 2.4M11 2.5V13M11 13l2.4-2.4M11 13l-2.4-2.4"/>',
+  numbers: '<circle cx="8" cy="8" r="5.7"/><path d="M6.9 6.5L8.2 5.6v4.9M6.9 10.5h2.6"/>',
+  people: '<circle cx="8" cy="5.2" r="2.5"/><path d="M3 13.6a5 5 0 0 1 10 0"/>',
+  download: '<path d="M8 2.5v7.5M8 10l3-3M8 10L5 7M2.8 13h10.4"/>',
+  check: '<path d="M3.2 8.4l3.4 3.4 6.2-7"/>',
+  warn: '<path d="M8 2.6l6.2 10.8H1.8z"/><path d="M8 6.8v3M8 11.9v.4"/>',
+};
+
+const iconSvg = (name) =>
+  `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" ` +
+  `stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+
+function paintIcons(root) {
+  root.querySelectorAll("[data-icon]").forEach((node) => {
+    node.innerHTML = iconSvg(node.dataset.icon);
+  });
+}
+
+/* Swap the download button's icon briefly to signal the outcome of a save. */
+let flashTimer = null;
+function flashIcon(name) {
+  el.pngBtn.innerHTML = iconSvg(name);
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { el.pngBtn.innerHTML = iconSvg("download"); }, 1600);
+}
+
 function buildBeltControls() {
   el.belts.innerHTML = "";
 
   for (const belt of BELTS) {
     const row = document.createElement("div");
-    row.className = "belt-row";
+    row.className = "field";
+    row.dataset.belt = belt.id;
+    row.title = belt.name;          // the colour is the label; this is the gloss
 
     const chip = document.createElement("div");
     chip.className = "chip";
     chip.style.background = belt.stripe
       ? `linear-gradient(${belt.base} 0 34%, ${belt.stripe} 34% 66%, ${belt.base} 66% 100%)`
       : belt.base;
-
-    const right = document.createElement("div");
-
-    const label = document.createElement("div");
-    label.className = "flabel";
-    label.innerHTML =
-      `<span>${escapeXml(belt.name)} <span class="rank-tag" data-rank="${belt.id}"></span></span>` +
-      `<span class="fval"></span>`;
-    const valueOut = label.querySelector(".fval");
-    valueOut.textContent = state.counts[belt.id];
 
     const slider = document.createElement("input");
     slider.type = "range";
@@ -470,6 +519,10 @@ function buildBeltControls() {
     slider.value = state.counts[belt.id];
     slider.setAttribute("aria-label", `${belt.name} count`);
 
+    const valueOut = document.createElement("span");
+    valueOut.className = "fval";
+    valueOut.textContent = state.counts[belt.id];
+
     slider.addEventListener("input", () => {
       state.counts[belt.id] = Number(slider.value);
       valueOut.textContent = slider.value;
@@ -477,8 +530,7 @@ function buildBeltControls() {
       render();
     });
 
-    right.append(label, slider);
-    row.append(chip, right);
+    row.append(chip, slider, valueOut);
     el.belts.append(row);
   }
 }
@@ -510,10 +562,11 @@ if (window.claude && typeof window.claude.use === "function") {
 function saveFile(filename, blob) {
   if (claudeDownloads) {
     claudeDownloads.save({ filename, data: blob })
-      .then(() => setStatus(`Saved ${filename}`, false))
+      .then(() => flashIcon("check"))
       .catch((err) => {
         if (err && err.code === "declined") return;
-        setStatus(`Could not save: ${(err && err.code) || "unknown error"}`, true);
+        el.pngBtn.title = `Could not save: ${(err && err.code) || "unknown error"}`;
+        flashIcon("warn");
       });
     return;
   }
@@ -526,7 +579,7 @@ function saveFile(filename, blob) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  setStatus(`Saved ${filename}`, false);
+  flashIcon("check");
 }
 
 /* Rasterise by loading the SVG as a data URL into an <img>. The SVG has no
@@ -547,11 +600,11 @@ el.pngBtn.addEventListener("click", () => {
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob((blob) => {
-      if (!blob) return setStatus("Could not render PNG", true);
+      if (!blob) return flashIcon("warn");
       saveFile(`${FILENAME}.png`, blob);
     }, "image/png");
   };
-  img.onerror = () => setStatus("Could not render the image", true);
+  img.onerror = () => flashIcon("warn");
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markup);
 });
 
@@ -559,6 +612,7 @@ el.pngBtn.addEventListener("click", () => {
    7. Start
 --------------------------------------------------------------------------- */
 
+paintIcons(document);
 buildBeltControls();
 fitGrid();
 render();
