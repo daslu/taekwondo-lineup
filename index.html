@@ -18,7 +18,7 @@
     5. buildSvg()          pure: state -> SVG string (this is the infographic)
     6. render()            SVG string -> DOM, plus status line
     7. controls            slider wiring
-    8. export              PNG / SVG download
+    8. export              PNG download
 
   The SVG is built as a string rather than through the DOM so that the same
   function serves both the on-screen preview and the exported file. It uses
@@ -185,8 +185,7 @@
       <h2 class="sr-only">Lineup preview</h2>
       <div id="stage" role="img" aria-label="Overhead plan of the class lined up in rank order, most senior at the front right, each row filling right to left"></div>
       <div class="bar">
-        <button id="pngBtn" class="primary">Download PNG</button>
-        <button id="svgBtn">Download SVG</button>
+        <button id="pngBtn" class="primary">Download</button>
         <span id="status"></span>
       </div>
     </section>
@@ -264,7 +263,7 @@ const el = {
   rowsVal: $("rowsVal"), colsVal: $("colsVal"),
   showNums: $("showNums"), reverse: $("reverse"),
   belts: $("belts"), stage: $("stage"), status: $("status"),
-  pngBtn: $("pngBtn"), svgBtn: $("svgBtn"),
+  pngBtn: $("pngBtn"),
 };
 
 const escapeXml = (s) => String(s)
@@ -495,6 +494,9 @@ el.reverse.addEventListener("change", () => { state.reversed = el.reverse.checke
    Two paths. Inside the Claude artifact runtime the file goes through
    claude.use("downloads"); everywhere else — a local file, your own site —
    it falls back to an object URL and a synthetic click.
+
+   buildSvg() still backs this: the SVG is rasterised to PNG rather than
+   offered as its own download.
 --------------------------------------------------------------------------- */
 
 let claudeDownloads = null;
@@ -505,9 +507,9 @@ if (window.claude && typeof window.claude.use === "function") {
     .catch(() => {});
 }
 
-function saveFile(filename, data, mimeType) {
+function saveFile(filename, blob) {
   if (claudeDownloads) {
-    claudeDownloads.save({ filename, data })
+    claudeDownloads.save({ filename, data: blob })
       .then(() => setStatus(`Saved ${filename}`, false))
       .catch((err) => {
         if (err && err.code === "declined") return;
@@ -516,7 +518,6 @@ function saveFile(filename, data, mimeType) {
     return;
   }
 
-  const blob = data instanceof Blob ? data : new Blob([data], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -527,10 +528,6 @@ function saveFile(filename, data, mimeType) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   setStatus(`Saved ${filename}`, false);
 }
-
-el.svgBtn.addEventListener("click", () => {
-  saveFile(`${FILENAME}.svg`, buildSvg().markup, "image/svg+xml");
-});
 
 /* Rasterise by loading the SVG as a data URL into an <img>. The SVG has no
    external references, so the canvas stays untainted and toBlob works. */
@@ -551,10 +548,10 @@ el.pngBtn.addEventListener("click", () => {
 
     canvas.toBlob((blob) => {
       if (!blob) return setStatus("Could not render PNG", true);
-      saveFile(`${FILENAME}.png`, blob, "image/png");
+      saveFile(`${FILENAME}.png`, blob);
     }, "image/png");
   };
-  img.onerror = () => setStatus("Could not render PNG — try the SVG", true);
+  img.onerror = () => setStatus("Could not render the image", true);
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markup);
 });
 
