@@ -256,8 +256,14 @@
 --------------------------------------------------------------------------- */
 
 /*
-  Belts in rank order, most senior first. Names are not here — they live in
-  STRINGS, keyed by `id`, so a belt reads correctly in every language.
+  Ranks in order, most senior first. Names are not here — they live in
+  STRINGS, keyed by `id`, so each one reads correctly in every language.
+
+  Only green / yellow / white and their mixes are belts. The last two entries
+  are the pre-belt stages and are deliberately the most junior: `grey` is a
+  student in a club shirt, `purple` a student still in their own clothes.
+  Neither is called a belt in any of the translations.
+
   `base`   fill colour of the circle
   `stripe` colour of the horizontal band, or null for a plain belt
   `ink`    colour of the position number drawn on top
@@ -337,7 +343,7 @@ const STRINGS = {
   en: {
     title: "Taekwondo lineup builder",
     floor: "Floor",
-    students: "Students per belt",
+    students: "Students",
     preview: "Lineup preview",
     plan: "Overhead plan of the class lined up in rank order, most senior at the front right, each row filling right to left",
     rows: "Rows",
@@ -348,22 +354,22 @@ const STRINGS = {
     language: "Language",
     download: "Download PNG",
     instructor: "Instructor",
-    count: (belt) => `${belt} count`,
+    count: (rank) => `${rank} count`,
     belts: {
-      green: "Green",
-      yg: "Yellow, green stripe",
-      yellow: "Yellow",
-      wy: "White, yellow stripe",
-      white: "White",
-      grey: "Grey",
-      purple: "Purple",
+      green: "Green belt",
+      yg: "Yellow-green belt",
+      yellow: "Yellow belt",
+      wy: "White-yellow belt",
+      white: "White belt",
+      grey: "Club shirt",
+      purple: "Own clothes",
     },
   },
 
   de: {
     title: "Taekwondo-Aufstellungsplaner",
     floor: "Trainingsfläche",
-    students: "Schüler pro Gürtel",
+    students: "Schüler",
     preview: "Vorschau der Aufstellung",
     plan: "Draufsicht der Klasse in Rangfolge, der ranghöchste Schüler vorne rechts, jede Reihe von rechts nach links gefüllt",
     rows: "Reihen",
@@ -374,22 +380,22 @@ const STRINGS = {
     language: "Sprache",
     download: "PNG herunterladen",
     instructor: "Trainer",
-    count: (belt) => `Anzahl ${belt}`,
+    count: (rank) => `Anzahl ${rank}`,
     belts: {
-      green: "Grün",
-      yg: "Gelb mit grünem Streifen",
-      yellow: "Gelb",
-      wy: "Weiß mit gelbem Streifen",
-      white: "Weiß",
-      grey: "Grau",
-      purple: "Violett",
+      green: "Grün-Gurt",
+      yg: "Gelb-Grün-Gurt",
+      yellow: "Gelb-Gurt",
+      wy: "Weiß-Gelb-Gurt",
+      white: "Weiß-Gurt",
+      grey: "Vereinsshirt",
+      purple: "Eigene Kleidung",
     },
   },
 
   ar: {
     title: "مخطط اصطفاف التايكوندو",
     floor: "أرضية التدريب",
-    students: "الطلاب حسب الحزام",
+    students: "الطلاب",
     preview: "معاينة الاصطفاف",
     plan: "مخطط علوي للصف مرتبًا حسب الرتبة، الأقدم في المقدمة على اليمين، وكل صف يُملأ من اليمين إلى اليسار",
     rows: "الصفوف",
@@ -400,15 +406,15 @@ const STRINGS = {
     language: "اللغة",
     download: "تنزيل بصيغة PNG",
     instructor: "المدرب",
-    count: (belt) => `عدد ${belt}`,
+    count: (rank) => `عدد ${rank}`,
     belts: {
-      green: "أخضر",
-      yg: "أصفر بخط أخضر",
-      yellow: "أصفر",
-      wy: "أبيض بخط أصفر",
-      white: "أبيض",
-      grey: "رمادي",
-      purple: "بنفسجي",
+      green: "حزام أخضر",
+      yg: "حزام أصفر-أخضر",
+      yellow: "حزام أصفر",
+      wy: "حزام أبيض-أصفر",
+      white: "حزام أبيض",
+      grey: "قميص النادي",
+      purple: "ملابس خاصة",
     },
   },
 };
