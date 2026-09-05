@@ -14,6 +14,7 @@
     1. <style>            page chrome (CSS custom properties, light/dark)
     2. <body>             static markup; the belt controls are generated
     3. CONFIG              belts, defaults, geometry, palette  <- edit here first
+    3b. STRINGS            en / de / ar; the only words in the product
     4. state / helpers
     5. buildSvg()          pure: state -> SVG string (this is the infographic)
     6. render()            SVG string -> DOM, plus the headcount readout
@@ -87,7 +88,7 @@
   }
   .field + .field { margin-top: 10px; }
 
-  .fval { font-size: 12px; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+  .fval { font-size: 12px; color: var(--ink-2); text-align: end; font-variant-numeric: tabular-nums; }
 
   .ico { display: flex; align-items: center; justify-content: center; color: var(--ink-3); }
   .ico svg, button svg { display: block; }
@@ -99,7 +100,13 @@
   /* Rank order is shown by the order of the rows themselves; render() sets it. */
   #belts { display: flex; flex-direction: column; }
 
-  .toggles { display: flex; gap: 8px; margin-top: 14px; }
+  .toggles { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .toggles select {
+    font: inherit; font-size: 13px;
+    margin-inline-start: auto; max-width: 45%; padding: 6px 8px;
+    background: var(--card); color: var(--ink);
+    border: 1px solid var(--line-2); border-radius: var(--radius);
+  }
 
   .icon-toggle { position: relative; display: block; cursor: pointer; }
   .icon-toggle input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; }
@@ -125,7 +132,7 @@
   button:hover { border-color: var(--ink-3); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-  .count { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--ink-2); }
+  .count { display: flex; align-items: center; gap: 6px; margin-inline-start: auto; color: var(--ink-2); }
   .count .ico { color: inherit; }
   .count.warn { color: var(--danger); }
   #status { font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -183,45 +190,56 @@
 
 <body>
 <div class="wrap">
-  <h1 class="sr-only">Taekwondo lineup builder</h1>
+  <h1 class="sr-only" data-t="title"></h1>
 
   <div class="cols">
     <div>
       <section class="panel">
-        <h2 class="sr-only">Floor</h2>
+        <h2 class="sr-only" data-t="floor"></h2>
         <div class="field">
           <span class="ico" data-icon="rows"></span>
-          <input type="range" id="rows" min="1" max="8" value="4" aria-label="Rows">
+          <input type="range" id="rows" min="1" max="8" value="4" data-t-aria="rows">
           <span class="fval" id="rowsVal"></span>
         </div>
         <div class="field">
           <span class="ico" data-icon="cols"></span>
-          <input type="range" id="cols" min="1" max="10" value="4" aria-label="Columns">
+          <input type="range" id="cols" min="1" max="10" value="4" data-t-aria="cols">
           <span class="fval" id="colsVal"></span>
         </div>
         <div class="toggles">
-          <label class="icon-toggle" title="Show position numbers">
-            <input type="checkbox" id="showNums" aria-label="Show position numbers">
+          <label class="icon-toggle" data-t-title="numbers">
+            <input type="checkbox" id="showNums" data-t-aria="numbers">
             <span data-icon="numbers"></span>
           </label>
-          <label class="icon-toggle" title="Reverse rank order">
-            <input type="checkbox" id="reverse" aria-label="Reverse rank order">
+          <label class="icon-toggle" data-t-title="reverse">
+            <input type="checkbox" id="reverse" data-t-aria="reverse">
             <span data-icon="reverse"></span>
           </label>
+          <label class="icon-toggle" data-t-title="legend">
+            <input type="checkbox" id="showLegend" data-t-aria="legend">
+            <span data-icon="legend"></span>
+          </label>
+          <!-- The one place words are unavoidable: each language names itself. -->
+          <select id="lang" data-t-aria="language" data-t-title="language">
+            <option value="en">English</option>
+            <option value="de">Deutsch</option>
+            <option value="ar">العربية</option>
+          </select>
         </div>
       </section>
 
       <section class="panel">
-        <h2 class="sr-only">Students per belt</h2>
+        <h2 class="sr-only" data-t="students"></h2>
         <div id="belts"></div>
       </section>
     </div>
 
     <section class="panel">
-      <h2 class="sr-only">Lineup preview</h2>
-      <div id="stage" role="img" aria-label="Overhead plan of the class lined up in rank order, most senior at the front right, each row filling right to left"></div>
+      <h2 class="sr-only" data-t="preview"></h2>
+      <div id="stage" role="img" data-t-aria="plan"></div>
       <div class="bar">
-        <button id="pngBtn" class="primary" data-icon="download" aria-label="Download PNG" title="Download PNG"></button>
+        <button id="pngBtn" class="primary" data-icon="download"
+                data-t-aria="download" data-t-title="download"></button>
         <span class="count" id="count">
           <span class="ico" data-icon="people"></span><span id="status"></span>
         </span>
@@ -238,24 +256,25 @@
 --------------------------------------------------------------------------- */
 
 /*
-  Belts in rank order, most senior first.
+  Belts in rank order, most senior first. Names are not here — they live in
+  STRINGS, keyed by `id`, so a belt reads correctly in every language.
   `base`   fill colour of the circle
   `stripe` colour of the horizontal band, or null for a plain belt
   `ink`    colour of the position number drawn on top
 */
 const BELTS = [
-  { id: "green",  name: "Green",                base: "#2E7D4F", stripe: null,      ink: "#FFFFFF" },
-  { id: "yg",     name: "Yellow, green stripe", base: "#F0C93C", stripe: "#2E7D4F", ink: "#3B3306" },
-  { id: "yellow", name: "Yellow",               base: "#F0C93C", stripe: null,      ink: "#3B3306" },
-  { id: "wy",     name: "White, yellow stripe", base: "#FCFBF7", stripe: "#F0C93C", ink: "#3A3A36" },
-  { id: "white",  name: "White",                base: "#FCFBF7", stripe: null,      ink: "#3A3A36" },
-  { id: "grey",   name: "Grey",                 base: "#777777", stripe: null,      ink: "#FFFFFF" },
-  { id: "purple", name: "Purple",               base: "#6B4FA8", stripe: null,      ink: "#FFFFFF" },
+  { id: "green",  base: "#2E7D4F", stripe: null,      ink: "#FFFFFF" },
+  { id: "yg",     base: "#F0C93C", stripe: "#2E7D4F", ink: "#3B3306" },
+  { id: "yellow", base: "#F0C93C", stripe: null,      ink: "#3B3306" },
+  { id: "wy",     base: "#FCFBF7", stripe: "#F0C93C", ink: "#3A3A36" },
+  { id: "white",  base: "#FCFBF7", stripe: null,      ink: "#3A3A36" },
+  { id: "grey",   base: "#777777", stripe: null,      ink: "#FFFFFF" },
+  { id: "purple", base: "#6B4FA8", stripe: null,      ink: "#FFFFFF" },
 ];
 
 const DEFAULT_COUNTS = { green: 3, yg: 1, yellow: 2, wy: 3, white: 3, grey: 2, purple: 2 };
 
-const INSTRUCTOR = { name: "Instructor", base: "#191917", stripe: null, ink: "#FFFFFF" };
+const INSTRUCTOR = { base: "#191917", stripe: null, ink: "#FFFFFF" };
 
 /* Geometry of the infographic, in SVG user units. */
 const GEO = {
@@ -264,6 +283,22 @@ const GEO = {
   minWidth: 320,       // keeps a narrow grid from rendering as a sliver
   pad: 40,             // horizontal padding inside the mat
   stripeFraction: 0.34, // half-height of the stripe, as a fraction of the radius
+};
+
+/*
+  Legend geometry, used only when the legend is switched on. Its row count and
+  column width are derived from the entries themselves, so adding a belt or
+  switching to a language with longer names cannot clip it.
+*/
+const LEGEND = {
+  cols: 2,
+  swatch: 9,          // radius of the legend circle
+  rowHeight: 26,
+  gap: 18,            // between the two columns
+  fontSize: 12,
+  charWidth: 0.6,     // rough glyph advance, as a fraction of fontSize
+  textGap: 8,         // swatch to label
+  topGap: 20,         // grid to the first legend row
 };
 
 /* Fixed palette for the exported image — deliberately does not follow the
@@ -284,6 +319,101 @@ const LIMITS = { maxPerBelt: 20, maxRows: 8, maxCols: 10 };
 const FILENAME = "taekwondo-lineup";
 
 /* ---------------------------------------------------------------------------
+   1b. STRINGS
+
+   The interface is wordless by design, so almost everything below is read
+   only by screen readers, tooltips and the optional legend. `belts` is keyed
+   by BELTS[].id; `count` builds the per-slider label.
+
+   Note for translators: the seating convention is physical, not textual. The
+   most senior student stands front-right in every language, including the
+   right-to-left ones — the drawing is never mirrored.
+--------------------------------------------------------------------------- */
+
+const LANGS = ["en", "de", "ar"];
+const RTL = new Set(["ar"]);
+
+const STRINGS = {
+  en: {
+    title: "Taekwondo lineup builder",
+    floor: "Floor",
+    students: "Students per belt",
+    preview: "Lineup preview",
+    plan: "Overhead plan of the class lined up in rank order, most senior at the front right, each row filling right to left",
+    rows: "Rows",
+    cols: "Columns",
+    numbers: "Show position numbers",
+    reverse: "Reverse rank order",
+    legend: "Show legend",
+    language: "Language",
+    download: "Download PNG",
+    instructor: "Instructor",
+    count: (belt) => `${belt} count`,
+    belts: {
+      green: "Green",
+      yg: "Yellow, green stripe",
+      yellow: "Yellow",
+      wy: "White, yellow stripe",
+      white: "White",
+      grey: "Grey",
+      purple: "Purple",
+    },
+  },
+
+  de: {
+    title: "Taekwondo-Aufstellungsplaner",
+    floor: "Trainingsfläche",
+    students: "Schüler pro Gürtel",
+    preview: "Vorschau der Aufstellung",
+    plan: "Draufsicht der Klasse in Rangfolge, der ranghöchste Schüler vorne rechts, jede Reihe von rechts nach links gefüllt",
+    rows: "Reihen",
+    cols: "Spalten",
+    numbers: "Positionsnummern anzeigen",
+    reverse: "Rangfolge umkehren",
+    legend: "Legende anzeigen",
+    language: "Sprache",
+    download: "PNG herunterladen",
+    instructor: "Trainer",
+    count: (belt) => `Anzahl ${belt}`,
+    belts: {
+      green: "Grün",
+      yg: "Gelb mit grünem Streifen",
+      yellow: "Gelb",
+      wy: "Weiß mit gelbem Streifen",
+      white: "Weiß",
+      grey: "Grau",
+      purple: "Violett",
+    },
+  },
+
+  ar: {
+    title: "مخطط اصطفاف التايكوندو",
+    floor: "أرضية التدريب",
+    students: "الطلاب حسب الحزام",
+    preview: "معاينة الاصطفاف",
+    plan: "مخطط علوي للصف مرتبًا حسب الرتبة، الأقدم في المقدمة على اليمين، وكل صف يُملأ من اليمين إلى اليسار",
+    rows: "الصفوف",
+    cols: "الأعمدة",
+    numbers: "إظهار أرقام المواقع",
+    reverse: "عكس ترتيب الرتب",
+    legend: "إظهار مفتاح الألوان",
+    language: "اللغة",
+    download: "تنزيل بصيغة PNG",
+    instructor: "المدرب",
+    count: (belt) => `عدد ${belt}`,
+    belts: {
+      green: "أخضر",
+      yg: "أصفر بخط أخضر",
+      yellow: "أصفر",
+      wy: "أبيض بخط أصفر",
+      white: "أبيض",
+      grey: "رمادي",
+      purple: "بنفسجي",
+    },
+  },
+};
+
+/* ---------------------------------------------------------------------------
    2. State
 --------------------------------------------------------------------------- */
 
@@ -293,13 +423,29 @@ const state = {
   cols: 4,
   showNumbers: false,
   reversed: false,
+  showLegend: false,
+  lang: "en",          // replaced by detectLang() at startup
 };
+
+/* First matching UI language, else English. */
+function detectLang() {
+  const tags = navigator.languages || [navigator.language || "en"];
+  for (const tag of tags) {
+    const base = String(tag).toLowerCase().split("-")[0];
+    if (LANGS.includes(base)) return base;
+  }
+  return "en";
+}
+
+const t = () => STRINGS[state.lang] || STRINGS.en;
+const isRtl = () => RTL.has(state.lang);
 
 const $ = (id) => document.getElementById(id);
 const el = {
   rows: $("rows"), cols: $("cols"),
   rowsVal: $("rowsVal"), colsVal: $("colsVal"),
   showNums: $("showNums"), reverse: $("reverse"),
+  showLegend: $("showLegend"), lang: $("lang"),
   belts: $("belts"), stage: $("stage"),
   count: $("count"), status: $("status"), pngBtn: $("pngBtn"),
 };
@@ -397,14 +543,37 @@ function buildSvg() {
   const placed = students.slice(0, capacity);
 
   // --- layout -------------------------------------------------------------
+  /*
+    The legend is sized from its own contents — longest label, entry count —
+    so neither a new belt nor a wordier language can overflow the drawing.
+  */
+  const legend = state.showLegend
+    ? [{ label: t().instructor, spec: INSTRUCTOR },
+       ...rankedBelts().map((b) => ({ label: t().belts[b.id], spec: b }))]
+    : [];
+
+  const legendColWidth = legend.length
+    ? Math.round(LEGEND.swatch * 2 + LEGEND.textGap +
+        Math.max(...legend.map((e) => e.label.length)) * LEGEND.fontSize * LEGEND.charWidth)
+    : 0;
+  const legendWidth = legend.length
+    ? LEGEND.cols * legendColWidth + (LEGEND.cols - 1) * LEGEND.gap
+    : 0;
+  const legendRows = Math.ceil(legend.length / LEGEND.cols);
+
   const gridWidth = cols * cell;
-  const width = Math.max(gridWidth + pad * 2, GEO.minWidth);
+  const width = Math.max(gridWidth + pad * 2, legendWidth + pad * 2, GEO.minWidth);
   const gridLeft = (width - gridWidth) / 2;
 
   const instructorCy = 34 + R;
   const frontLineY = instructorCy + R + 22;
   const gridTop = frontLineY + 26;
-  const height = gridTop + rows * cell + 24;
+  const gridBottom = gridTop + rows * cell;
+
+  const legendTop = gridBottom + LEGEND.topGap;
+  const height = legend.length
+    ? legendTop + legendRows * LEGEND.rowHeight + 12
+    : gridBottom + 24;
 
   // --- draw ---------------------------------------------------------------
   const svg = [];
@@ -432,6 +601,39 @@ function buildSvg() {
     const cy = gridTop + row * cell + cell / 2;
     svg.push(circleMarkup(i, cx, cy, R, belt, state.showNumbers ? String(i + 1) : ""));
   });
+
+  /*
+    Legend, two columns. In a right-to-left language the swatch sits on the
+    right of its label and the text is end-anchored; the lineup itself is not
+    mirrored, because front-right is a physical convention, not a textual one.
+  */
+  if (legend.length) {
+    const rtl = isRtl();
+    const legendLeft = (width - legendWidth) / 2;
+
+    legend.forEach((item, i) => {
+      // In RTL the first entry belongs in the rightmost column, so the reading
+      // order across a row still runs instructor, then belts by rank.
+      const slot = i % LEGEND.cols;
+      const colIndex = rtl ? LEGEND.cols - 1 - slot : slot;
+      const rowIndex = Math.floor(i / LEGEND.cols);
+      const colLeft = legendLeft + colIndex * (legendColWidth + LEGEND.gap);
+      const cy = legendTop + rowIndex * LEGEND.rowHeight + LEGEND.rowHeight / 2;
+      const cx = rtl ? colLeft + legendColWidth - LEGEND.swatch : colLeft + LEGEND.swatch;
+      const tx = cx + (rtl ? -1 : 1) * (LEGEND.swatch + LEGEND.textGap);
+
+      svg.push(circleMarkup(`legend-${i}`, cx, cy, LEGEND.swatch, item.spec, ""));
+      // text-anchor stays "start" in both directions: with direction="rtl" the
+      // start edge is the right-hand one, so the label runs away from the
+      // swatch either way. Anchoring "end" would run it back over the swatch.
+      svg.push(
+        `<text x="${tx}" y="${cy}" text-anchor="start" ` +
+        (rtl ? 'direction="rtl" ' : "") +
+        `dominant-baseline="central" font-family="${SVG_FONT}" ` +
+        `font-size="${LEGEND.fontSize}" fill="${PAPER.ink}">${escapeXml(item.label)}</text>`
+      );
+    });
+  }
 
   svg.push("</svg>");
 
@@ -475,6 +677,8 @@ const ICONS = {
   reverse: '<path d="M5 13.5V3M5 3L2.6 5.4M5 3l2.4 2.4M11 2.5V13M11 13l2.4-2.4M11 13l-2.4-2.4"/>',
   numbers: '<circle cx="8" cy="8" r="5.7"/><path d="M6.9 6.5L8.2 5.6v4.9M6.9 10.5h2.6"/>',
   people: '<circle cx="8" cy="5.2" r="2.5"/><path d="M3 13.6a5 5 0 0 1 10 0"/>',
+  legend: '<circle cx="3.6" cy="4.6" r="1.9"/><path d="M8 4.6h5.6"/>' +
+          '<circle cx="3.6" cy="11.4" r="1.9"/><path d="M8 11.4h5.6"/>',
   download: '<path d="M8 2.5v7.5M8 10l3-3M8 10L5 7M2.8 13h10.4"/>',
   check: '<path d="M3.2 8.4l3.4 3.4 6.2-7"/>',
   warn: '<path d="M8 2.6l6.2 10.8H1.8z"/><path d="M8 6.8v3M8 11.9v.4"/>',
@@ -504,8 +708,8 @@ function buildBeltControls() {
   for (const belt of BELTS) {
     const row = document.createElement("div");
     row.className = "field";
-    row.dataset.belt = belt.id;
-    row.title = belt.name;          // the colour is the label; this is the gloss
+    row.dataset.belt = belt.id;     // the colour is the label; applyBeltStrings
+                                    // fills in title / aria-label per language
 
     const chip = document.createElement("div");
     chip.className = "chip";
@@ -518,7 +722,6 @@ function buildBeltControls() {
     slider.min = "0";
     slider.max = String(LIMITS.maxPerBelt);
     slider.value = state.counts[belt.id];
-    slider.setAttribute("aria-label", `${belt.name} count`);
 
     const valueOut = document.createElement("span");
     valueOut.className = "fval";
@@ -536,10 +739,48 @@ function buildBeltControls() {
   }
 }
 
+/* Static labels are addressed by key: data-t (text), -aria, -title. */
+function applyStrings(root) {
+  const s = t();
+  root.querySelectorAll("[data-t]").forEach((n) => { n.textContent = s[n.dataset.t]; });
+  root.querySelectorAll("[data-t-aria]").forEach((n) => {
+    n.setAttribute("aria-label", s[n.dataset.tAria]);
+  });
+  root.querySelectorAll("[data-t-title]").forEach((n) => { n.title = s[n.dataset.tTitle]; });
+}
+
+/* The generated belt rows carry no text, only a name for tooltip and reader. */
+function applyBeltStrings() {
+  const s = t();
+  el.belts.querySelectorAll("[data-belt]").forEach((row) => {
+    const name = s.belts[row.dataset.belt];
+    row.title = name;
+    row.querySelector("input").setAttribute("aria-label", s.count(name));
+  });
+}
+
+/*
+  Switching language also switches document direction, which mirrors the
+  controls. It deliberately does not mirror the lineup: front-right is where
+  the senior student physically stands, in every language.
+*/
+function applyLanguage(lang) {
+  state.lang = LANGS.includes(lang) ? lang : "en";
+  document.documentElement.lang = state.lang;
+  document.documentElement.dir = isRtl() ? "rtl" : "ltr";
+  document.title = t().title;
+  el.lang.value = state.lang;
+  applyStrings(document);
+  applyBeltStrings();
+  render();
+}
+
 el.rows.addEventListener("input", () => { state.rows = Number(el.rows.value); render(); });
 el.cols.addEventListener("input", () => { state.cols = Number(el.cols.value); render(); });
 el.showNums.addEventListener("change", () => { state.showNumbers = el.showNums.checked; render(); });
 el.reverse.addEventListener("change", () => { state.reversed = el.reverse.checked; render(); });
+el.showLegend.addEventListener("change", () => { state.showLegend = el.showLegend.checked; render(); });
+el.lang.addEventListener("change", () => applyLanguage(el.lang.value));
 
 /* ---------------------------------------------------------------------------
    6. Export
@@ -616,7 +857,7 @@ el.pngBtn.addEventListener("click", () => {
 paintIcons(document);
 buildBeltControls();
 fitGrid();
-render();
+applyLanguage(detectLang());   // also renders
 </script>
 </body>
 </html>
